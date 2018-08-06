@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
     uint64_t bytes    = 0;
     errors errors     = { 0 };
 
+    uint64_t duration_us = cfg.duration * 1e6;
     uint64_t sleepTime = 0;
     uint64_t totalTime = 0;
     uint64_t totalReqs = 0;
@@ -153,13 +154,13 @@ int main(int argc, char **argv) {
     long double intervalRPS = 0;
     // Report periodic throughput
     if (cfg.interval > 0) {
-        while (totalTime < cfg.duration && stop == 0) {
+	while (totalTime < duration_us && stop == 0) {
             sleepTime = cfg.interval;
-            if (totalTime + sleepTime > cfg.duration) {
-                sleepTime = totalTime + cfg.interval - cfg.duration;
+            if (totalTime + sleepTime > duration_us) {
+                sleepTime = totalTime + cfg.interval - duration_us;
             }
             totalTime += sleepTime;
-            sleep(sleepTime);
+            usleep(sleepTime);
             currentReqs = 0;
             for (uint64_t i = 0; i < cfg.threads; i++) {
                 thread *t = &threads[i];
@@ -167,8 +168,8 @@ int main(int argc, char **argv) {
             }
             intervalReqs = currentReqs - totalReqs;
             totalReqs = currentReqs;
-            intervalRPS = intervalReqs / sleepTime;
-            printf("%4"PRIu64"s: %"PRIu64" requests in last %"PRIu64"s (%9.1Lf req/sec)\n", totalTime, intervalReqs, sleepTime, intervalRPS);
+            intervalRPS = (uint64_t)((double)intervalReqs * 1e6 / sleepTime);
+            printf("%10"PRIu64"us: %"PRIu64" requests in last %"PRIu64"us (%9.1Lf req/sec)\n", totalTime, intervalReqs, sleepTime, intervalRPS);
         }
     } else {
         sleep(cfg.duration);
@@ -532,7 +533,7 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
                 if (scan_time(optarg, &cfg->duration)) return -1;
                 break;
             case 'i':
-                if (scan_time(optarg, &cfg->interval)) return -1;
+		if (scan_time_us(optarg, &cfg->interval)) return -1;
                 break;
             case 's':
                 cfg->script = optarg;
