@@ -14,6 +14,7 @@ static struct config {
     bool     delay;
     bool     dynamic;
     bool     latency;
+    char    *bindhost;
     char    *host;
     char    *script;
     SSL_CTX *ctx;
@@ -45,6 +46,7 @@ static void handler(int sig) {
 static void usage() {
     printf("Usage: wrk <options> <url>                            \n"
            "  Options:                                            \n"
+           "    -b, --bind        <A>  Local IP address to bind to\n"
            "    -c, --connections <N>  Connections to keep open   \n"
            "    -d, --duration    <T>  Duration of test           \n"
            "    -t, --threads     <N>  Number of threads to use   \n"
@@ -248,6 +250,7 @@ void *thread_main(void *arg) {
         c->request = request;
         c->length  = length;
         c->delayed = cfg.delay;
+	c->bindaddr = cfg.bindhost == NULL ? inet_addr(cfg.bindhost) : INADDR_NONE;
         connect_socket(thread, c);
     }
 
@@ -264,6 +267,7 @@ void *thread_main(void *arg) {
 }
 
 static int connect_socket(thread *thread, connection *c) {
+    struct sockaddr_in localaddr;
     struct addrinfo *addr = thread->addr;
     struct aeEventLoop *loop = thread->loop;
     int fd, flags;
@@ -272,6 +276,13 @@ static int connect_socket(thread *thread, connection *c) {
 
     flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    if (c->bindaddr != INADDR_NONE) {
+        localaddr.sin_family = AF_INET;
+        localaddr.sin_addr.s_addr = c->bindaddr;
+        localaddr.sin_port = 0;  // Any local port will do
+        bind(fd, (struct sockaddr *)&localaddr, sizeof(localaddr));
+    }
 
     if (connect(fd, addr->ai_addr, addr->ai_addrlen) == -1) {
         if (errno != EINPROGRESS) goto error;
@@ -520,11 +531,15 @@ static int parse_args(struct config *cfg, char **url, struct http_parser_url *pa
     cfg->duration    = 10;
     cfg->timeout     = SOCKET_TIMEOUT_MS;
     cfg->interval    = 0;
+    cfg->bindhost    = NULL;
 
-    while ((c = getopt_long(argc, argv, "t:c:d:i:s:H:T:Lrv?", longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "b:t:c:d:i:s:H:T:Lrv?", longopts, NULL)) != -1) {
         switch (c) {
             case 't':
                 if (scan_metric(optarg, &cfg->threads)) return -1;
+                break;
+            case 'b':
+                cfg->bindhost = optarg;
                 break;
             case 'c':
                 if (scan_metric(optarg, &cfg->connections)) return -1;

@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -50,6 +52,7 @@ typedef struct connection {
     enum {
         FIELD, VALUE
     } state;
+    in_addr_t bindaddr;
     int fd;
     SSL *ssl;
     bool delayed;
