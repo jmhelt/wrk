@@ -250,7 +250,7 @@ void *thread_main(void *arg) {
         c->request = request;
         c->length  = length;
         c->delayed = cfg.delay;
-	c->bindaddr = cfg.bindhost == NULL ? inet_addr(cfg.bindhost) : INADDR_NONE;
+	c->bindaddr = cfg.bindhost == NULL ? INADDR_NONE : inet_addr(cfg.bindhost);
         connect_socket(thread, c);
     }
 
